@@ -5,6 +5,7 @@ import { useFieldArray, useForm } from 'react-hook-form'
 import { createOrder, getOrders } from '../api/orders'
 import { Button, ErrorMessage, Loading, StatusBadge } from '../components'
 import type { CreateOrderRequest, OrderStatus } from '../types/order'
+import { formatDate, formatMoney, formatShortId } from '../utils/format'
 
 type OrderStatusFilter = 'all' | OrderStatus
 
@@ -104,6 +105,7 @@ export function OrdersPage() {
               </label>
               <input
                 className="form-input"
+                disabled={createOrderMutation.isPending}
                 id="customer-name"
                 {...register('customer_name', { required: 'Укажите клиента' })}
               />
@@ -118,6 +120,7 @@ export function OrdersPage() {
               </label>
               <input
                 className="form-input"
+                disabled={createOrderMutation.isPending}
                 id="customer-phone"
                 {...register('customer_phone', { required: 'Укажите телефон' })}
               />
@@ -134,6 +137,7 @@ export function OrdersPage() {
               </label>
               <textarea
                 className="form-textarea"
+                disabled={createOrderMutation.isPending}
                 id="delivery-address"
                 {...register('delivery_address', { required: 'Укажите адрес' })}
               />
@@ -148,6 +152,7 @@ export function OrdersPage() {
               <div className="form-section-header">
                 <span className="form-label">Товары</span>
                 <Button
+                  disabled={createOrderMutation.isPending}
                   onClick={() => {
                     setFormError(null)
                     append({ ...emptyOrderItem })
@@ -168,6 +173,7 @@ export function OrdersPage() {
                       </label>
                       <input
                         className="form-input"
+                        disabled={createOrderMutation.isPending}
                         id={`item-name-${field.id}`}
                         {...register(`items.${index}.name`, {
                           required: 'Укажите товар',
@@ -189,6 +195,7 @@ export function OrdersPage() {
                       </label>
                       <input
                         className="form-input"
+                        disabled={createOrderMutation.isPending}
                         id={`item-quantity-${field.id}`}
                         min={1}
                         type="number"
@@ -214,6 +221,7 @@ export function OrdersPage() {
                       </label>
                       <input
                         className="form-input"
+                        disabled={createOrderMutation.isPending}
                         id={`item-price-${field.id}`}
                         min={0}
                         step="0.01"
@@ -235,6 +243,7 @@ export function OrdersPage() {
                     </div>
 
                     <Button
+                      disabled={createOrderMutation.isPending}
                       onClick={() => remove(index)}
                       type="button"
                       variant="danger"
@@ -309,7 +318,7 @@ export function OrdersPage() {
                   {ordersQuery.data.length === 0 ? (
                     <tr>
                       <td className="table-empty" colSpan={7}>
-                        Заказы не найдены.
+                        Заказов пока нет
                       </td>
                     </tr>
                   ) : (
@@ -326,7 +335,7 @@ export function OrdersPage() {
                         <td>
                           <StatusBadge status={order.status} />
                         </td>
-                        <td>{formatCourier(order.courier_id)}</td>
+                        <td>{formatShortId(order.courier_id)}</td>
                         <td>{formatDate(order.created_at)}</td>
                       </tr>
                     ))
@@ -339,34 +348,6 @@ export function OrdersPage() {
       </div>
     </section>
   )
-}
-
-function formatCourier(courierId?: string) {
-  return courierId ? courierId.slice(0, 8) : '-'
-}
-
-function formatDate(value?: string | null) {
-  if (!value) {
-    return '-'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('ru-RU', {
-    currency: 'RUB',
-    style: 'currency',
-  }).format(value)
 }
 
 function getErrorMessage(error: unknown) {

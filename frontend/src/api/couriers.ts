@@ -23,6 +23,10 @@ export function getAvailableCouriers() {
   )
 }
 
+export function getCourierById(id: string) {
+  return apiClient<Courier>(`/api/couriers/${id}`)
+}
+
 export function createCourier(data: CreateCourierRequest) {
   return apiClient<Courier>('/api/couriers', {
     method: 'POST',
@@ -34,6 +38,12 @@ export function updateCourierStatus(id: string, data: UpdateCourierStatusRequest
   return apiClient<MessageResponse>(`/api/couriers/${id}/status`, {
     method: 'PUT',
     body: data,
+  })
+}
+
+export function deleteCourier(id: string) {
+  return apiClient<MessageResponse>(`/api/couriers/${id}`, {
+    method: 'DELETE',
   })
 }
 

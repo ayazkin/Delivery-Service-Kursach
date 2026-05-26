@@ -1,9 +1,15 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  assignOrderToCourier,
+  getAvailableCouriers,
+  getCourierById,
+} from '../api/couriers'
 import { getOrderById, updateOrderStatus } from '../api/orders'
 import { Button, ErrorMessage, Loading, StatusBadge } from '../components'
 import type { OrderStatus } from '../types/order'
+import { formatDate, formatMoney, formatShortId } from '../utils/format'
 
 const orderStatusOptions: Array<{
   label: string
@@ -22,6 +28,7 @@ export function OrderDetailsPage() {
   const { id } = useParams()
   const queryClient = useQueryClient()
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | ''>('')
+  const [selectedCourierId, setSelectedCourierId] = useState('')
 
   const orderQuery = useQuery({
     enabled: Boolean(id),
@@ -29,19 +36,46 @@ export function OrderDetailsPage() {
     queryFn: () => getOrderById(id ?? ''),
   })
 
+  const order = orderQuery.data
+  const currentStatus = order?.status
+  const canAssignCourier = currentStatus === 'created'
+
+  const availableCouriersQuery = useQuery({
+    enabled: Boolean(id) && canAssignCourier,
+    queryKey: ['couriers', 'available'],
+    queryFn: getAvailableCouriers,
+  })
+
+  const assignedCourierQuery = useQuery({
+    enabled: Boolean(order?.courier_id),
+    queryKey: ['courier', order?.courier_id],
+    queryFn: () => getCourierById(order?.courier_id ?? ''),
+  })
+
   const updateStatusMutation = useMutation({
     mutationFn: (status: OrderStatus) => updateOrderStatus(id ?? '', { status }),
     onSuccess: async () => {
+      setSelectedStatus('')
       await queryClient.invalidateQueries({ queryKey: ['order', id] })
       await queryClient.invalidateQueries({ queryKey: ['orders'] })
     },
   })
 
-  const order = orderQuery.data
-  const currentStatus = order?.status
+  const assignCourierMutation = useMutation({
+    mutationFn: (courierId: string) =>
+      assignOrderToCourier(courierId, { order_id: id ?? '' }),
+    onSuccess: async () => {
+      setSelectedCourierId('')
+      await queryClient.invalidateQueries({ queryKey: ['order', id] })
+      await queryClient.invalidateQueries({ queryKey: ['orders'] })
+      await queryClient.invalidateQueries({ queryKey: ['couriers'] })
+      await queryClient.invalidateQueries({ queryKey: ['courier'] })
+    },
+  })
+
   const statusValue = selectedStatus || currentStatus || 'created'
 
-  const onUpdateStatus = (event: React.FormEvent<HTMLFormElement>) => {
+  const onUpdateStatus = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!selectedStatus || selectedStatus === currentStatus) {
@@ -49,6 +83,16 @@ export function OrderDetailsPage() {
     }
 
     updateStatusMutation.mutate(selectedStatus)
+  }
+
+  const onAssignCourier = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!selectedCourierId) {
+      return
+    }
+
+    assignCourierMutation.mutate(selectedCourierId)
   }
 
   return (
@@ -77,6 +121,10 @@ export function OrderDetailsPage() {
 
       {updateStatusMutation.isError && (
         <ErrorMessage message={getErrorMessage(updateStatusMutation.error)} />
+      )}
+
+      {assignCourierMutation.isError && (
+        <ErrorMessage message={getErrorMessage(assignCourierMutation.error)} />
       )}
 
       {order && (
@@ -123,7 +171,7 @@ export function OrderDetailsPage() {
                     {(order.items ?? []).length === 0 ? (
                       <tr>
                         <td className="table-empty" colSpan={4}>
-                          Товары не найдены.
+                          Товаров пока нет
                         </td>
                       </tr>
                     ) : (
@@ -160,13 +208,89 @@ export function OrderDetailsPage() {
               </div>
               <div>
                 <dt>Курьер</dt>
-                <dd>{order.courier_id ? order.courier_id.slice(0, 8) : '-'}</dd>
+                <dd>
+                  {order.courier_id
+                    ? getCourierDisplayName(
+                        assignedCourierQuery.data?.name,
+                        assignedCourierQuery.isLoading,
+                        order.courier_id,
+                      )
+                    : '-'}
+                </dd>
               </div>
               <div>
                 <dt>Создан</dt>
                 <dd>{formatDate(order.created_at)}</dd>
               </div>
             </dl>
+
+            <div className="assignment-block">
+              <div className="section-header">
+                <h2>Назначение курьера</h2>
+              </div>
+
+              {!canAssignCourier && (
+                <p className="muted-message">
+                  Назначение доступно только для заказа в статусе «Создан».
+                  Текущий backend назначает курьера и переводит заказ в
+                  «Принят» одной операцией.
+                </p>
+              )}
+
+              {canAssignCourier && availableCouriersQuery.isLoading && (
+                <Loading label="Ищем доступных курьеров..." />
+              )}
+
+              {canAssignCourier && availableCouriersQuery.isError && (
+                <ErrorMessage
+                  message={getErrorMessage(availableCouriersQuery.error)}
+                />
+              )}
+
+              {canAssignCourier &&
+                availableCouriersQuery.isSuccess &&
+                availableCouriersQuery.data.length === 0 && (
+                  <p className="muted-message">Доступных курьеров нет.</p>
+                )}
+
+              {canAssignCourier &&
+                availableCouriersQuery.isSuccess &&
+                availableCouriersQuery.data.length > 0 && (
+                  <form className="form" onSubmit={onAssignCourier}>
+                    <div className="form-row">
+                      <label className="form-label" htmlFor="available-courier">
+                        Доступный курьер
+                      </label>
+                      <select
+                        className="form-select"
+                        disabled={assignCourierMutation.isPending}
+                        id="available-courier"
+                        onChange={(event) =>
+                          setSelectedCourierId(event.target.value)
+                        }
+                        value={selectedCourierId}
+                      >
+                        <option value="">Выберите курьера</option>
+                        {availableCouriersQuery.data.map((courier) => (
+                          <option key={courier.id} value={courier.id}>
+                            {courier.name} / {courier.phone}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button
+                      disabled={
+                        assignCourierMutation.isPending || !selectedCourierId
+                      }
+                      type="submit"
+                    >
+                      {assignCourierMutation.isPending
+                        ? 'Назначение...'
+                        : 'Назначить'}
+                    </Button>
+                  </form>
+                )}
+            </div>
 
             <form className="form status-form" onSubmit={onUpdateStatus}>
               <div className="form-row">
@@ -175,6 +299,7 @@ export function OrderDetailsPage() {
                 </label>
                 <select
                   className="form-select"
+                  disabled={updateStatusMutation.isPending}
                   id="order-status"
                   onChange={(event) =>
                     setSelectedStatus(event.target.value as OrderStatus)
@@ -206,30 +331,22 @@ export function OrderDetailsPage() {
   )
 }
 
-function formatDate(value?: string | null) {
-  if (!value) {
-    return '-'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('ru-RU', {
-    currency: 'RUB',
-    style: 'currency',
-  }).format(value)
-}
-
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Произошла ошибка'
+}
+
+function getCourierDisplayName(
+  name: string | undefined,
+  isLoading: boolean,
+  courierId: string,
+) {
+  if (name) {
+    return name
+  }
+
+  if (isLoading) {
+    return 'Загрузка...'
+  }
+
+  return formatShortId(courierId)
 }

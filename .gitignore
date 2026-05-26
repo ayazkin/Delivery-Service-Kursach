@@ -20,6 +20,7 @@ go.work
 # Environment variables
 .env
 .env.local
+*.docx
 
 # IDE files
 .vscode/
@@ -27,6 +28,7 @@ go.work
 *.swp
 *.swo
 *~
+*.go.[0-9]*
 
 # OS generated files
 .DS_Store
@@ -39,6 +41,7 @@ Thumbs.db
 
 # Application specific
 delivery-server
+dispatcher-server
 logs/
 *.log
 
@@ -47,4 +50,12 @@ logs/
 
 # Temporary files
 tmp/
-temp/ 
+temp/
+coursework/
+qa-screenshots/
+
+# Local report assets
+project-requirements*.svg
+site-architecture*.svg
+sse-event-stream-schema.svg
+test-commands-schema.svg

@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { createCourier, getCouriers, updateCourierStatus } from '../api/couriers'
+import {
+  createCourier,
+  deleteCourier,
+  getCouriers,
+  updateCourierStatus,
+} from '../api/couriers'
 import { Button, ErrorMessage, Loading, StatusBadge } from '../components'
 import type {
   CourierStatus,
   CreateCourierRequest,
 } from '../types/courier'
+import { formatDate } from '../utils/format'
 
 type CourierStatusFilter = 'all' | CourierStatus
 
@@ -72,12 +78,27 @@ export function CouriersPage() {
     },
   })
 
+  const deleteCourierMutation = useMutation({
+    mutationFn: deleteCourier,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['couriers'] })
+    },
+  })
+
   const onCreateCourier = (data: CreateCourierRequest) => {
     createCourierMutation.mutate(data)
   }
 
   const onUpdateStatus = (courierId: string, status: CourierStatus) => {
     updateStatusMutation.mutate({ courierId, status })
+  }
+
+  const onDeleteCourier = (courierId: string) => {
+    if (!window.confirm('Удалить курьера? Это действие нельзя отменить.')) {
+      return
+    }
+
+    deleteCourierMutation.mutate(courierId)
   }
 
   return (
@@ -102,6 +123,7 @@ export function CouriersPage() {
               </label>
               <input
                 className="form-input"
+                disabled={createCourierMutation.isPending}
                 id="courier-name"
                 {...register('name', { required: 'Укажите имя курьера' })}
               />
@@ -116,6 +138,7 @@ export function CouriersPage() {
               </label>
               <input
                 className="form-input"
+                disabled={createCourierMutation.isPending}
                 id="courier-phone"
                 {...register('phone', { required: 'Укажите телефон курьера' })}
               />
@@ -171,6 +194,10 @@ export function CouriersPage() {
             <ErrorMessage message={getErrorMessage(updateStatusMutation.error)} />
           )}
 
+          {deleteCourierMutation.isError && (
+            <ErrorMessage message={getErrorMessage(deleteCourierMutation.error)} />
+          )}
+
           {couriersQuery.isSuccess && (
             <div className="table-wrapper">
               <table className="data-table">
@@ -187,7 +214,7 @@ export function CouriersPage() {
                   {couriersQuery.data.length === 0 ? (
                     <tr>
                       <td className="table-empty" colSpan={5}>
-                        Курьеры не найдены.
+                        Курьеров пока нет
                       </td>
                     </tr>
                   ) : (
@@ -211,6 +238,20 @@ export function CouriersPage() {
                             }
                             onSubmit={onUpdateStatus}
                           />
+                          <Button
+                            className="button-compact"
+                            disabled={
+                              deleteCourierMutation.isPending &&
+                              deleteCourierMutation.variables === courier.id
+                            }
+                            onClick={() => onDeleteCourier(courier.id)}
+                            variant="danger"
+                          >
+                            {deleteCourierMutation.isPending &&
+                            deleteCourierMutation.variables === courier.id
+                              ? 'Удаление...'
+                              : 'Удалить'}
+                          </Button>
                         </td>
                       </tr>
                     ))
@@ -251,6 +292,7 @@ function CourierStatusAction({
     >
       <select
         className="form-select status-select"
+        disabled={isPending}
         onChange={(event) =>
           setSelectedStatus(event.target.value as CourierStatus)
         }
@@ -271,23 +313,6 @@ function CourierStatusAction({
       </Button>
     </form>
   )
-}
-
-function formatDate(value?: string | null) {
-  if (!value) {
-    return '-'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date)
 }
 
 function getErrorMessage(error: unknown) {

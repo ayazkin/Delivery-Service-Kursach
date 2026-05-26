@@ -1,7 +1,7 @@
 # Delivery System Makefile
 
 # Переменные
-BINARY_NAME=delivery-server
+BINARY_NAME=dispatcher-server
 DOCKER_IMAGE=delivery-system
 VERSION=latest
 
@@ -11,7 +11,7 @@ VERSION=latest
 # Сборка бинарного файла
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@go build -o $(BINARY_NAME) cmd/server/main.go
+	@go build -o $(BINARY_NAME) cmd/dispatcher/main.go
 
 # Очистка артефактов сборки
 clean:
@@ -22,7 +22,7 @@ clean:
 # Запуск приложения
 run:
 	@echo "Running application..."
-	@go run cmd/server/main.go
+	@go run cmd/dispatcher/main.go
 
 # Запуск тестов
 test:
@@ -47,24 +47,24 @@ docker-run:
 # Docker Compose команды
 up:
 	@echo "Starting all services..."
-	@docker-compose up -d
+	@docker compose up -d
 
 down:
 	@echo "Stopping all services..."
-	@docker-compose down
+	@docker compose down
 
 logs:
 	@echo "Showing logs..."
-	@docker-compose logs -f
+	@docker compose logs -f
 
 # Разработка
 dev-up:
 	@echo "Starting development environment..."
-	@docker-compose up -d postgres redis kafka zookeeper
+	@docker compose up -d postgres redis kafka zookeeper
 
 dev-down:
 	@echo "Stopping development environment..."
-	@docker-compose down
+	@docker compose down
 
 # Проверка состояния
 health:

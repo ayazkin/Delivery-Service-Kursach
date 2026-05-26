@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { AppLayout } from './layouts/AppLayout'
 import { CouriersPage } from './pages/CouriersPage'
+import { EventMonitorPage } from './pages/EventMonitorPage'
 import { OrderDetailsPage } from './pages/OrderDetailsPage'
 import { OrdersPage } from './pages/OrdersPage'
 
@@ -13,6 +14,7 @@ function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailsPage />} />
         <Route path="/couriers" element={<CouriersPage />} />
+        <Route path="/monitor" element={<EventMonitorPage />} />
       </Route>
     </Routes>
   )

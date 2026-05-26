@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Сборка приложения
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o delivery-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dispatcher-server ./cmd/dispatcher
 
 # Production stage
 FROM alpine:latest
@@ -35,10 +35,10 @@ WORKDIR /app
 RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
 
 # Копирование бинарного файла из builder stage
-COPY --from=builder /build/delivery-server .
+COPY --from=builder /build/dispatcher-server .
 
 # Изменение владельца файлов
-RUN chown appuser:appuser delivery-server
+RUN chown appuser:appuser dispatcher-server
 
 # Переключение на пользователя appuser
 USER appuser
@@ -51,4 +51,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Запуск приложения
-CMD ["./delivery-server"] 
+CMD ["./dispatcher-server"] 
