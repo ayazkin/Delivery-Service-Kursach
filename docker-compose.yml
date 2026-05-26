@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -106,6 +104,43 @@ services:
         condition: service_healthy
     volumes:
       - app-logs:/app/logs
+
+  event-monitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.monitor
+    container_name: event-monitor
+    restart: always
+    ports:
+      - "8090:8090"
+    environment:
+      - MONITOR_HOST=0.0.0.0
+      - MONITOR_PORT=8090
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_GROUP_ID=delivery-monitor-service
+      - KAFKA_TOPIC_ORDERS=orders
+      - KAFKA_TOPIC_COURIERS=couriers
+      - KAFKA_TOPIC_LOCATIONS=locations
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+        VITE_MONITOR_API_BASE_URL: http://localhost:8090
+    container_name: delivery-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      delivery-app:
+        condition: service_healthy
+      event-monitor:
+        condition: service_healthy
 
 volumes:
   postgres-data:
